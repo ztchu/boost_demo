@@ -7,8 +7,8 @@
 
 #define LOG_INFO std::cout
 #define LOG_WARN std::cerr
-#define LOG_WARN std::cerr
-#define LOG_ENDLINE std::endl
+#define LOG_ERROR std::cerr
+#define ENDLINE std::endl
 #else
 
 #define LOG_ENDLINE ""

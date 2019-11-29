@@ -126,11 +126,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="ip_address.cpp" />
+    <ClCompile Include="ip_address_pool.cpp" />
+    <ClCompile Include="ip_detector.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="ip_address.h" />
+    <ClInclude Include="ip_address_pool.h" />
+    <ClInclude Include="ip_detector.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
