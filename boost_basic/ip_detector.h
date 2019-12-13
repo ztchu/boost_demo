@@ -28,7 +28,7 @@ private:
     void DoAsyncReceive();
     void ReceiveHandler(const boost::system::error_code& error,
         std::size_t bytes_transferred,
-        boost::asio::ip::udp::socket& socket);
+        const std::string& ip);
     void CloseAllSockets();
 
 private:
@@ -38,11 +38,13 @@ private:
     IpDetectCallback callback_;
     std::string multicast_ip_;
     uint16_t multicast_port_;
-    std::vector<uint8_t*> recv_buffers_;
-    std::vector<boost::asio::ip::udp::socket> sockets_;
-    std::vector<boost::asio::ip::udp::endpoint> sender_endpoints_;
+    std::map<std::string, boost::asio::ip::udp::socket> sockets_;
+    std::map<std::string, std::unique_ptr<uint8_t>> recv_buffers_;
+    std::map<std::string, boost::asio::ip::udp::endpoint> sender_endpoints_;
 
     std::thread detect_thread_;
+
+    // The definition of this variable may cause crash, in boardcast project.
     std::mutex socket_mutex_;
 };
 

@@ -58,16 +58,22 @@ bool IpDetector::InitSockets() {
         }
         socket.set_option(boost::asio::socket_base::receive_buffer_size(1000 * 1024), ec);
 
-        boost::asio::ip::udp::endpoint listen_endpoint(local_address, multicast_port_);
+        // 1. If bind local address here, linux platform can't receive multicast data.
+        // 2. If bind 0.0.0.0, linux can receive and send, but windows only can receive.
+        // 3. If bind multicast address, linux is OK, but windows unsupported.
+        boost::asio::ip::udp::endpoint listen_endpoint(
+            boost::asio::ip::address::from_string("0.0.0.0"),
+            multicast_port_);
         socket.bind(listen_endpoint, ec);
         if (ec) {
             LOG_ERROR << "Socket bind error: " << ec;
             return false;
         }
 
-        recv_buffers_.push_back(new uint8_t[kBufferLen]);
-        sender_endpoints_.emplace_back(boost::asio::ip::udp::endpoint());
-        sockets_.emplace_back(std::move(socket));
+        std::unique_ptr<uint8_t> buffer(new uint8_t[kBufferLen]);
+        recv_buffers_.insert({ ip_v4_list[i], std::move(buffer) });
+        sender_endpoints_.insert({ ip_v4_list[i], boost::asio::ip::udp::endpoint() });
+        sockets_.insert({ ip_v4_list[i], std::move(socket) });
     }
     return true;
 }
@@ -79,45 +85,46 @@ void IpDetector::DoStartReceive() {
 
 void IpDetector::DoAsyncReceive() {
     std::lock_guard<std::mutex> lock(socket_mutex_);
-    for (size_t i = 0; i < sockets_.size(); ++i) {
-        if (sockets_[i].is_open()) {
-            sockets_[i].async_receive_from(
-                boost::asio::buffer(recv_buffers_[i], kBufferLen),
-                sender_endpoints_[i],
+    for (auto iter = sockets_.begin(); iter != sockets_.end(); ++iter) {
+        if (iter->second.is_open()) {
+            iter->second.async_receive_from(
+                boost::asio::buffer(recv_buffers_[iter->first].get(), kBufferLen),
+                sender_endpoints_[iter->first],
                 boost::bind(&IpDetector::ReceiveHandler, this,
                     boost::asio::placeholders::error,
                     boost::asio::placeholders::bytes_transferred,
-                    std::ref(sockets_[i])));
+                    iter->first));
         }
     }
 }
 
 void IpDetector::ReceiveHandler(const boost::system::error_code& error,
                                 std::size_t bytes_transferred,
-                                boost::asio::ip::udp::socket& socket) {
+                                const std::string& ip) {
     if (error) {
         LOG_WARN << "Receive data error: " << error << ENDLINE;
         return;
     }
 
+    if (io_service_.stopped()) {
+        LOG_INFO << "The io_service has been stopped.";
+        return;
+    }
+
     if (bytes_transferred > 0) {
-        auto ip_str = socket.local_endpoint().address().to_string();
-        LOG_INFO << "Ip detected is: " << ip_str << ENDLINE;
-        CloseAllSockets();
+        LOG_INFO << "Ip detected is: " << ip << ENDLINE;
 
         io_service_.stop();
-        callback_(ip_str);
+        CloseAllSockets();
+
+        callback_(ip);
     }
 }
 
 void IpDetector::CloseAllSockets() {
     std::lock_guard<std::mutex> lock(socket_mutex_);
-    for (size_t i = 0; i < sockets_.size(); ++i) {
-        sockets_[i].close();
-        if (recv_buffers_[i]) {
-            delete[] recv_buffers_[i];
-            recv_buffers_[i] = nullptr;
-        }
+    for (auto iter = sockets_.begin(); iter != sockets_.end(); ++iter) {
+        iter->second.close();
     }
 }
 

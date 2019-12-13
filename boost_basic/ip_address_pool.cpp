@@ -76,6 +76,7 @@ void IpAddressPool::PrintIpV6Address() const {
     }
 }
 
+#ifdef _WIN32
 void IpAddressPool::ParseIpAddress() {
     using resolver = boost::asio::ip::tcp::resolver;
     resolver ip_resolver(io_service_);
@@ -93,3 +94,79 @@ void IpAddressPool::ParseIpAddress() {
         }
     }
 }
+#endif
+
+#ifdef IOS_MAC
+bool IpAddressDetector::ParseIpAddress() {
+    struct ifaddrs * ifAddrStruct = NULL;
+    struct ifaddrs * ifa = NULL;
+    void * tmpAddrPtr = NULL;
+    getifaddrs(&ifAddrStruct);
+    for (ifa = ifAddrStruct; ifa != NULL; ifa = ifa->ifa_next) {
+        if (!ifa->ifa_addr) {
+            continue;
+        }
+        if (ifa->ifa_addr->sa_family == AF_INET) { // check it is IP4
+          // is a valid IP4 Address
+            tmpAddrPtr = &((struct sockaddr_in *)ifa->ifa_addr)->sin_addr;
+            char addressBuffer[INET_ADDRSTRLEN];
+            inet_ntop(AF_INET, tmpAddrPtr, addressBuffer, INET_ADDRSTRLEN);
+            ip_v4_list_.push_back(addressBuffer);
+        }
+        else if (ifa->ifa_addr->sa_family == AF_INET6) { // check it is IP6
+       //TODO
+        }
+    }
+    if (ifAddrStruct != NULL) freeifaddrs(ifAddrStruct);
+    PrintIpV4Address();
+    if (ip_v4_list_.empty())
+        return false;
+    return true;
+}
+#endif
+
+#ifdef ANDROID
+bool IpAddressDetector::ParseIpAddress() {
+    // File descriptor for socket
+    int socketfd;
+    socketfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (socketfd >= 0) {
+        struct ifconf conf;
+        char data[4096];
+        conf.ifc_len = sizeof(data);
+        conf.ifc_buf = (caddr_t)data;
+        if (ioctl(socketfd, SIOCGIFCONF, &conf) < 0) {
+            return false;
+        }
+
+        struct ifreq *ifr;
+        ifr = (struct ifreq*)data;
+        char address_buffer[INET6_ADDRSTRLEN];
+        while ((char*)ifr < data + conf.ifc_len) {
+            switch (ifr->ifr_addr.sa_family) {
+            case AF_INET:
+                if (inet_ntop(AF_INET, &((struct sockaddr_in*)&ifr->ifr_addr)->sin_addr,
+                    address_buffer, INET_ADDRSTRLEN)) {
+                    ip_v4_list_.push_back(address_buffer);
+                }
+                break;
+            case AF_INET6:
+                // TODO: handle ipv6 here.
+                break;
+            }
+            ifr = (struct ifreq*)((char*)ifr + sizeof(*ifr));
+        }
+        close(socketfd);
+    }
+    else {
+        return false;
+    }
+
+    if (ip_v4_list_.empty())
+        return false;
+    PrintIpV4Address();
+    return true;
+}
+#endif
+
+
