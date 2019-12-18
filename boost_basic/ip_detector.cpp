@@ -128,6 +128,13 @@ void IpDetector::CloseAllSockets() {
     }
 }
 
+bool IpDetector::IsLoopbackIp(const std::string& ip) {
+    if (ip >= "127.0.0.1" && ip <= "127.255.255.254") {
+        return true;
+    }
+    return false;
+}
+
 void TestDetectorCallback(const std::string& ip) {
     LOG_INFO << "Valid ip: " << ip << ENDLINE;
 }
@@ -137,3 +144,11 @@ void TestIpDetector() {
     detector.StartDetect(TestDetectorCallback);
     system("pause");
 }
+
+void TestLoopbackIp() {
+    std::string ip("127.255.255");
+    if (IpDetector::IsLoopbackIp(ip)) {
+        LOG_INFO << ip << " is loopback ip." << ENDLINE;
+    }
+}
+

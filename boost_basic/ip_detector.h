@@ -21,6 +21,7 @@ public:
     IpDetector(const std::string& multicast_ip, uint16_t multicast_port);
     ~IpDetector();
     bool StartDetect(IpDetectCallback callback);
+    static bool IsLoopbackIp(const std::string& ip);
 
 private:
     bool InitSockets();
@@ -49,3 +50,4 @@ private:
 };
 
 void TestIpDetector();
+void TestLoopbackIp();

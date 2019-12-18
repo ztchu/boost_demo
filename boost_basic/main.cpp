@@ -5,7 +5,7 @@
 int main() {
     //TestIpAddress();
     
-    TestIpDetector();
+    TestLoopbackIp();
 
     system("pause");
 }
